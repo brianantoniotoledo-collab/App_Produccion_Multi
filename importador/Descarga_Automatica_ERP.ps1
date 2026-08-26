@@ -22,7 +22,7 @@ $RutaBaseAccess    = 'C:\Produccion\Base_Produccion.accdb'
 $CarpetaDescargas  = 'C:\Produccion\Descargas_ERP'
 $ArchivoLog        = 'C:\Produccion\Descarga_Automatica_ERP_log.txt'
 $TituloVentanaApp  = 'SISTEMA PRODUCTIVO COMAFRI'
-$NombreProcesoApp  = 'SPC'
+$NombreProcesoApp  = 'ProjectDesposte_Insumos'
 $TimeoutBusquedaSeg = 60
 
 function Escribir-Log {
