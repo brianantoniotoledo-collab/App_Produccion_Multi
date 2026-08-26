@@ -59,11 +59,14 @@ function Buscar-Elemento {
         [System.Windows.Automation.ControlType]$TipoControl,
         [int]$TimeoutSeg = $TimeoutBusquedaSeg
     )
-    $condiciones = @([System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, $Nombre))
+    $condicionNombre = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, $Nombre)
     if ($TipoControl) {
-        $condiciones += [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty, $TipoControl)
+        $condicionTipo = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty, $TipoControl)
+        $condicion = New-Object System.Windows.Automation.AndCondition($condicionNombre, $condicionTipo)
     }
-    $condicion = New-Object System.Windows.Automation.AndCondition(,$condiciones)
+    else {
+        $condicion = $condicionNombre
+    }
 
     $cronometro = [Diagnostics.Stopwatch]::StartNew()
     while ($cronometro.Elapsed.TotalSeconds -lt $TimeoutSeg) {
