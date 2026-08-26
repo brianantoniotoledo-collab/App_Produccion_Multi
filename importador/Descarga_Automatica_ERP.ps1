@@ -59,22 +59,36 @@ function Buscar-Elemento {
         [System.Windows.Automation.ControlType]$TipoControl,
         [int]$TimeoutSeg = $TimeoutBusquedaSeg
     )
-    $condicionNombre = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::NameProperty, $Nombre)
+    # Comparacion tolerante (sin distinguir mayusculas ni espacios sobrantes):
+    # UI Automation puede exponer el texto del control distinto a como se ve en pantalla.
     if ($TipoControl) {
-        $condicionTipo = [System.Windows.Automation.PropertyCondition]::new([System.Windows.Automation.AutomationElement]::ControlTypeProperty, $TipoControl)
-        $condicion = New-Object System.Windows.Automation.AndCondition($condicionNombre, $condicionTipo)
+        $condicion = New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, $TipoControl)
     }
     else {
-        $condicion = $condicionNombre
+        $condicion = [System.Windows.Automation.Condition]::TrueCondition
     }
 
     $cronometro = [Diagnostics.Stopwatch]::StartNew()
     while ($cronometro.Elapsed.TotalSeconds -lt $TimeoutSeg) {
-        $encontrado = $Origen.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $condicion)
-        if ($encontrado) { return $encontrado }
+        $candidatos = $Origen.FindAll([System.Windows.Automation.TreeScope]::Descendants, $condicion)
+        foreach ($candidato in $candidatos) {
+            if ($candidato.Current.Name.Trim() -ieq $Nombre.Trim()) { return $candidato }
+        }
         Start-Sleep -Milliseconds 500
     }
     throw "No se encontro el elemento '$Nombre' en $TimeoutSeg segundos."
+}
+
+function Volcar-NombresDescendientes {
+    param([System.Windows.Automation.AutomationElement]$Origen, [string]$Etiqueta)
+    try {
+        $todos = $Origen.FindAll([System.Windows.Automation.TreeScope]::Descendants, [System.Windows.Automation.Condition]::TrueCondition)
+        $nombres = $todos | ForEach-Object { $_.Current.Name } | Where-Object { $_ } | Select-Object -Unique
+        Escribir-Log "Diagnostico ($Etiqueta) - controles visibles: $($nombres -join ' | ')"
+    }
+    catch {
+        Escribir-Log "Diagnostico ($Etiqueta) - no se pudo enumerar: $($_.Exception.Message)"
+    }
 }
 
 function Buscar-ElementosPorClase {
@@ -215,5 +229,8 @@ try {
 }
 catch {
     Escribir-Log "ERROR: $($_.Exception.Message)"
+    if ($ventanaApp) {
+        Volcar-NombresDescendientes -Origen $ventanaApp -Etiqueta 'ventana principal al fallar'
+    }
     throw
 }
