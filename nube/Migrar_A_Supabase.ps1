@@ -67,7 +67,10 @@ $script:ModoAuth = 'ambos'
 function Encabezados {
     param([string]$Prefer, [string]$Modo)
     if (-not $Modo) { $Modo = $script:ModoAuth }
-    $h = @{ 'Content-Type' = 'application/json' }
+    # Content-Type NO va aca: Windows PowerShell lo ignora si se pasa dentro de
+    # -Headers y manda el cuerpo como formulario, lo que hace que PostgREST
+    # responda "Empty or invalid json". Se pasa con -ContentType en Enviar-Lote.
+    $h = @{}
     switch ($Modo) {
         # Las llaves nuevas (sb_secret_...) no son JWT: mandarlas tambien en
         # Authorization puede hacer que el servidor intente validarlas como JWT
@@ -163,7 +166,12 @@ function Enviar-Lote {
     }
     $cuerpo = $Filas | ConvertTo-Json -Depth 5
     if ($Filas.Count -eq 1) { $cuerpo = "[$cuerpo]" }
-    Invoke-RestMethod -Uri $uri -Headers (Encabezados -Prefer $prefer) -Method Post -Body $cuerpo | Out-Null
+    # Se envia como bytes UTF-8 explicitos: si se pasa el texto directamente,
+    # Windows PowerShell lo codifica en Latin-1 y rompe las tildes y la ñ de
+    # los nombres de producto.
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($cuerpo)
+    Invoke-RestMethod -Uri $uri -Headers (Encabezados -Prefer $prefer) -Method Post `
+        -ContentType 'application/json; charset=utf-8' -Body $bytes | Out-Null
 }
 
 $Tablas = @(
