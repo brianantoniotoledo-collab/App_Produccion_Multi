@@ -24,7 +24,11 @@ param(
     [string]$RutaAccess = 'C:\Produccion\Base_Produccion.accdb',
     [string]$SupabaseUrl,
     [string]$SupabaseKey,
-    [int]$TamanoLote = 500
+    [int]$TamanoLote = 500,
+    # Limita Cajas a lo producido desde esta fecha (formato yyyy-MM-dd).
+    # Sirve para no pasarse del limite de 500 MB del plan gratis de Supabase:
+    # el historico completo (~2M filas) no cabe. Vacio = migrar todo.
+    [string]$DesdeFecha
 )
 
 if (-not $SupabaseUrl -or -not $SupabaseKey) {
@@ -189,7 +193,14 @@ try {
         }
 
         $comando = $conexionAccess.CreateCommand()
-        $comando.CommandText = "SELECT * FROM [$($tabla.Access)]"
+        $consulta = "SELECT * FROM [$($tabla.Access)]"
+        if ($DesdeFecha -and $tabla.Access -eq 'Cajas') {
+            # SQL de Access: las fechas literales van entre almohadillas y en mm/dd/yyyy.
+            $fecha = [datetime]::ParseExact($DesdeFecha, 'yyyy-MM-dd', $null)
+            $consulta += " WHERE FechaDesposte >= #$($fecha.ToString('MM/dd/yyyy'))#"
+            Escribir-Log "  Filtrando Cajas desde $DesdeFecha."
+        }
+        $comando.CommandText = $consulta
         $lector = $comando.ExecuteReader()
 
         $claveConflicto = $null
