@@ -72,6 +72,39 @@ function Encabezados {
     return $h
 }
 
+function Probar-Conexion {
+    # Verifica credenciales ANTES de leer datos, para no fallar recien despues
+    # de procesar miles de filas.
+    $largo = $SupabaseKey.Length
+    $inicio = $SupabaseKey.Substring(0, [Math]::Min(12, $largo))
+    Escribir-Log "Verificando conexion. URL: $SupabaseUrl - llave: $largo caracteres, empieza con '$inicio...'"
+    try {
+        $uri = "$SupabaseUrl/rest/v1/cajas?select=numero_caja&limit=1"
+        Invoke-RestMethod -Uri $uri -Headers (Encabezados) -Method Get | Out-Null
+        Escribir-Log 'Conexion verificada correctamente.'
+    }
+    catch {
+        $codigo = $null
+        if ($_.Exception.Response) { $codigo = [int]$_.Exception.Response.StatusCode }
+        if ($codigo -eq 401) {
+            throw @"
+Supabase rechazo la llave (401 Invalid API key).
+
+Que revisar, en este orden:
+ 1. En Supabase: Project Settings -> API Keys. Si ahi ves una llave que
+    empieza con 'sb_secret_', usa ESA en conexion.txt (el proyecto usa el
+    sistema nuevo de llaves y la JWT larga 'eyJ...' ya no sirve).
+ 2. Que sea la llave secreta/service_role, no la publica (anon/publishable).
+ 3. Que en conexion.txt la llave este completa y en UNA sola linea.
+"@
+        }
+        if ($codigo -eq 404) {
+            throw "No se encontro la tabla 'cajas' en $SupabaseUrl. Revisa que hayas corrido schema_supabase.sql en el SQL Editor."
+        }
+        throw "No se pudo conectar a Supabase: $($_.Exception.Message)"
+    }
+}
+
 function Tabla-TieneFilas {
     param([string]$Tabla)
     $uri = "$SupabaseUrl/rest/v1/$Tabla" + '?select=id&limit=1'
@@ -176,6 +209,8 @@ $Tablas = @(
 )
 
 Escribir-Log 'Inicio de migracion a Supabase.'
+Probar-Conexion
+
 $conexionAccess = New-Object System.Data.OleDb.OleDbConnection("Provider=Microsoft.ACE.OLEDB.12.0;Data Source=$RutaAccess;")
 $conexionAccess.Open()
 
