@@ -28,7 +28,11 @@ param(
     # Limita Cajas a lo producido desde esta fecha (formato yyyy-MM-dd).
     # Sirve para no pasarse del limite de 500 MB del plan gratis de Supabase:
     # el historico completo (~2M filas) no cabe. Vacio = migrar todo.
-    [string]$DesdeFecha
+    [string]$DesdeFecha,
+    # Modo sincronizacion: sube solo lo que llego nuevo al Access desde la
+    # ultima vez, en vez de recorrer todo. Es el modo para la tarea programada
+    # que corre cada 20 minutos detras del importador.
+    [switch]$SoloNuevos
 )
 
 if (-not $SupabaseUrl -or -not $SupabaseKey) {
@@ -162,6 +166,17 @@ function Vaciar-Tabla {
     Invoke-RestMethod -Uri $uri -Headers (Encabezados) -Method Delete | Out-Null
 }
 
+function Obtener-MaximoEnNube {
+    # Devuelve el valor mas alto de una columna de fecha en la nube, para saber
+    # desde donde seguir subiendo sin repetir lo ya cargado.
+    param([string]$Tabla, [string]$Columna)
+    $uri = "$SupabaseUrl/rest/v1/$Tabla" + "?select=$Columna&order=$Columna.desc&limit=1"
+    $resultado = Invoke-RestMethod -Uri $uri -Headers (Encabezados) -Method Get
+    $fila = @($resultado)[0]
+    if (-not $fila -or -not $fila.$Columna) { return $null }
+    return [datetime]$fila.$Columna
+}
+
 function Enviar-Lote {
     param(
         [string]$Tabla,
@@ -185,7 +200,11 @@ function Enviar-Lote {
 }
 
 $Tablas = @(
+    # IncrementalAccess/IncrementalPg: columna de marca de tiempo que permite
+    # subir solo lo nuevo en modo -SoloNuevos. Las tablas sin esta columna son
+    # chicas y en ese modo se recargan completas.
     @{ Access = 'Cajas'; Postgres = 'cajas'; Estrategia = 'upsert'; ClaveConflicto = 'numero_caja'
+       IncrementalAccess = 'FechaImportacion'; IncrementalPg = 'fecha_importacion'
        Columnas = @(
             @{A='NumeroCaja'; P='numero_caja'}, @{A='NumeroSAG'; P='numero_sag'},
             @{A='PesoNeto'; P='peso_neto'}, @{A='PesoBruto'; P='peso_bruto'},
@@ -212,6 +231,7 @@ $Tablas = @(
        Columnas = @( @{A='Clave'; P='clave'}, @{A='Valor'; P='valor'} )
     },
     @{ Access = 'Despachos'; Postgres = 'despachos'; Estrategia = 'upsert'; ClaveConflicto = 'numero_caja'
+       IncrementalAccess = 'Creado'; IncrementalPg = 'creado'
        Columnas = @(
             @{A='FechaDespacho'; P='fecha_despacho'}, @{A='Cliente'; P='cliente'},
             @{A='SubCliente'; P='sub_cliente'}, @{A='Tipo'; P='tipo'},
@@ -257,7 +277,11 @@ $Tablas = @(
     }
 )
 
-Escribir-Log 'Inicio de migracion a Supabase.'
+if ($SoloNuevos) {
+    Escribir-Log 'Inicio de sincronizacion (solo lo nuevo).'
+} else {
+    Escribir-Log 'Inicio de migracion a Supabase.'
+}
 Probar-Conexion
 
 $conexionAccess = New-Object System.Data.OleDb.OleDbConnection("Provider=Microsoft.ACE.OLEDB.12.0;Data Source=$RutaAccess;")
@@ -265,20 +289,43 @@ $conexionAccess.Open()
 
 try {
     foreach ($tabla in $Tablas) {
-        Escribir-Log "Tabla $($tabla.Access) -> $($tabla.Postgres) (estrategia: $($tabla.Estrategia))"
+        # En modo sincronizacion las tablas de ingreso manual se recargan
+        # completas (son chicas y el Access manda), en vez de omitirse.
+        $estrategia = $tabla.Estrategia
+        if ($SoloNuevos -and $estrategia -eq 'insertar_si_vacia') { $estrategia = 'reemplazar' }
 
-        if ($tabla.Estrategia -eq 'insertar_si_vacia' -and (Tabla-TieneFilas -Tabla $tabla.Postgres)) {
+        $usaIncremental = $SoloNuevos -and $tabla.IncrementalAccess
+        if ($usaIncremental) { $estrategia = 'upsert' }
+
+        Escribir-Log "Tabla $($tabla.Access) -> $($tabla.Postgres) (estrategia: $estrategia)"
+
+        if ($estrategia -eq 'insertar_si_vacia' -and (Tabla-TieneFilas -Tabla $tabla.Postgres)) {
             Escribir-Log "  Se omite: $($tabla.Postgres) ya tiene datos (evita duplicar historico manual)."
             continue
         }
-        if ($tabla.Estrategia -eq 'reemplazar') {
+        if ($estrategia -eq 'reemplazar') {
             Vaciar-Tabla -Tabla $tabla.Postgres
             Escribir-Log "  $($tabla.Postgres) vaciada antes de recargar."
         }
 
         $comando = $conexionAccess.CreateCommand()
         $consulta = "SELECT * FROM [$($tabla.Access)]"
-        if ($DesdeFecha -and $tabla.Access -eq 'Cajas') {
+        if ($usaIncremental) {
+            # Solo lo que entro al Access despues de lo ultimo que ya esta en la
+            # nube. Se resta un minuto de holgura por si el importador escribio
+            # filas mientras corria la sincronizacion anterior; el upsert se
+            # encarga de que un solape no duplique nada.
+            $ultimo = Obtener-MaximoEnNube -Tabla $tabla.Postgres -Columna $tabla.IncrementalPg
+            if ($ultimo) {
+                $corte = $ultimo.AddMinutes(-1)
+                $consulta += " WHERE [$($tabla.IncrementalAccess)] > #$($corte.ToString('MM/dd/yyyy HH:mm:ss'))#"
+                Escribir-Log "  Subiendo lo posterior a $($corte.ToString('dd-MM-yyyy HH:mm:ss'))."
+            }
+            else {
+                Escribir-Log "  La nube esta vacia: se sube todo lo que haya."
+            }
+        }
+        elseif ($DesdeFecha -and $tabla.Access -eq 'Cajas') {
             # SQL de Access: las fechas literales van entre almohadillas y en mm/dd/yyyy.
             $fecha = [datetime]::ParseExact($DesdeFecha, 'yyyy-MM-dd', $null)
             $consulta += " WHERE FechaDesposte >= #$($fecha.ToString('MM/dd/yyyy'))#"
@@ -288,7 +335,7 @@ try {
         $lector = $comando.ExecuteReader()
 
         $claveConflicto = $null
-        if ($tabla.Estrategia -eq 'upsert') { $claveConflicto = $tabla.ClaveConflicto }
+        if ($estrategia -eq 'upsert') { $claveConflicto = $tabla.ClaveConflicto }
 
         $lote = New-Object System.Collections.Generic.List[object]
         $total = 0
