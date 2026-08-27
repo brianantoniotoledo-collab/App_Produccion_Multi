@@ -1,5 +1,6 @@
-# Credenciales locales: nunca se suben al repositorio.
-nube/conexion.txt
+# Credenciales y datos reales: nunca deben subirse al repositorio.
 *.accdb
-Descargas_ERP/
-*_log.txt
+*Esquema_Base_Produccion.txt
+config.local.ps1
+*.env
+.env
