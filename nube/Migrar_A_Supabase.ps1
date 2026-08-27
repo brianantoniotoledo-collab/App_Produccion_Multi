@@ -61,48 +61,79 @@ function Escribir-Log {
     Write-Host $linea
 }
 
+# Modo de autenticacion que resulto funcionar; lo fija Probar-Conexion.
+$script:ModoAuth = 'ambos'
+
 function Encabezados {
-    param([string]$Prefer)
-    $h = @{
-        'apikey'        = $SupabaseKey
-        'Authorization' = "Bearer $SupabaseKey"
-        'Content-Type'  = 'application/json'
+    param([string]$Prefer, [string]$Modo)
+    if (-not $Modo) { $Modo = $script:ModoAuth }
+    $h = @{ 'Content-Type' = 'application/json' }
+    switch ($Modo) {
+        # Las llaves nuevas (sb_secret_...) no son JWT: mandarlas tambien en
+        # Authorization puede hacer que el servidor intente validarlas como JWT
+        # y las rechace. Las legacy (eyJ...) si funcionan en ambos encabezados.
+        'apikey' { $h['apikey'] = $SupabaseKey }
+        'bearer' { $h['Authorization'] = "Bearer $SupabaseKey" }
+        default  { $h['apikey'] = $SupabaseKey; $h['Authorization'] = "Bearer $SupabaseKey" }
     }
     if ($Prefer) { $h['Prefer'] = $Prefer }
     return $h
 }
 
 function Probar-Conexion {
-    # Verifica credenciales ANTES de leer datos, para no fallar recien despues
-    # de procesar miles de filas.
+    # Verifica credenciales ANTES de leer datos, y prueba las tres formas de
+    # autenticar para no depender de adivinar cual espera este proyecto.
     $largo = $SupabaseKey.Length
-    $inicio = $SupabaseKey.Substring(0, [Math]::Min(12, $largo))
-    Escribir-Log "Verificando conexion. URL: $SupabaseUrl - llave: $largo caracteres, empieza con '$inicio...'"
-    try {
-        $uri = "$SupabaseUrl/rest/v1/cajas?select=numero_caja&limit=1"
-        Invoke-RestMethod -Uri $uri -Headers (Encabezados) -Method Get | Out-Null
-        Escribir-Log 'Conexion verificada correctamente.'
-    }
-    catch {
-        $codigo = $null
-        if ($_.Exception.Response) { $codigo = [int]$_.Exception.Response.StatusCode }
-        if ($codigo -eq 401) {
-            throw @"
-Supabase rechazo la llave (401 Invalid API key).
+    $inicio = $SupabaseKey.Substring(0, [Math]::Min(14, $largo))
+    $final = $SupabaseKey.Substring([Math]::Max(0, $largo - 4))
+    Escribir-Log "URL: $SupabaseUrl"
+    Escribir-Log "Llave: $largo caracteres, de '$inicio' a '...$final'"
 
-Que revisar, en este orden:
- 1. En Supabase: Project Settings -> API Keys. Si ahi ves una llave que
-    empieza con 'sb_secret_', usa ESA en conexion.txt (el proyecto usa el
-    sistema nuevo de llaves y la JWT larga 'eyJ...' ya no sirve).
- 2. Que sea la llave secreta/service_role, no la publica (anon/publishable).
- 3. Que en conexion.txt la llave este completa y en UNA sola linea.
+    if ($SupabaseKey -match '[^\x21-\x7E]') {
+        throw @"
+La llave contiene caracteres invalidos (espacios, puntos suspensivos o los
+puntitos de enmascarado). Eso pasa cuando se copia el texto oculto en pantalla
+en vez de usar el boton de copiar.
+
+Solucion: en Supabase -> Project Settings -> API Keys -> Secret keys, usa el
+BOTON DE COPIAR (icono de dos hojitas) y pega eso en conexion.txt.
 "@
-        }
-        if ($codigo -eq 404) {
-            throw "No se encontro la tabla 'cajas' en $SupabaseUrl. Revisa que hayas corrido schema_supabase.sql en el SQL Editor."
-        }
-        throw "No se pudo conectar a Supabase: $($_.Exception.Message)"
     }
+
+    $uri = "$SupabaseUrl/rest/v1/cajas?select=numero_caja&limit=1"
+    $errores = @()
+    foreach ($modo in @('apikey', 'ambos', 'bearer')) {
+        try {
+            Invoke-RestMethod -Uri $uri -Headers (Encabezados -Modo $modo) -Method Get | Out-Null
+            $script:ModoAuth = $modo
+            Escribir-Log "Conexion verificada correctamente (modo de autenticacion: $modo)."
+            return
+        }
+        catch {
+            $codigo = $null
+            if ($_.Exception.Response) { $codigo = [int]$_.Exception.Response.StatusCode }
+            if ($codigo -eq 404) {
+                throw "No se encontro la tabla 'cajas' en $SupabaseUrl. Revisa que hayas corrido schema_supabase.sql en el SQL Editor de Supabase."
+            }
+            $errores += "  modo '$modo': HTTP $codigo"
+        }
+    }
+
+    throw @"
+Supabase rechazo la llave con las tres formas de autenticar:
+$($errores -join "`n")
+
+La llave leida de conexion.txt tiene $largo caracteres ('$inicio...$final').
+
+Si $largo parece corto comparado con lo que ves en Supabase, quedo cortada al
+copiarla. Vuelve a copiarla con el BOTON DE COPIAR (no seleccionando el texto)
+desde Project Settings -> API Keys -> Secret keys, y pegala en conexion.txt en
+UNA sola linea.
+
+Si el largo es correcto, prueba con la llave legacy: en la pestana
+"Legacy anon, service_role API keys", boton Reveal en la fila service_role,
+copiar, y usar esa en conexion.txt.
+"@
 }
 
 function Tabla-TieneFilas {
