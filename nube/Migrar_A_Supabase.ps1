@@ -199,6 +199,71 @@ function Enviar-Lote {
         -ContentType 'application/json; charset=utf-8' -Body $bytes | Out-Null
 }
 
+function Vaciar-Con-Filtro {
+    # PostgREST exige un filtro para borrar. Se usa la propia llave primaria
+    # con "no es nulo", que siempre es verdadera y borra la tabla completa.
+    param([string]$Tabla, [string]$ColumnaLlave)
+    $uri = "$SupabaseUrl/rest/v1/$Tabla" + "?$ColumnaLlave=not.is.null"
+    Invoke-RestMethod -Uri $uri -Headers (Encabezados) -Method Delete | Out-Null
+}
+
+function Sincronizar-Configuraciones {
+    # Config_Zonas.json, Cerdos_Por_Dia.json, Peso_Vara.json y
+    # Tipos_Cambio.json viven como archivos sueltos en C:\Produccion y NO
+    # estan en el Access. La app web los necesita, y como se editan desde la
+    # app, deben quedar en la nube para que el cambio se vea en todos lados.
+    $carpeta = Split-Path -Parent $RutaAccess
+
+    $rutaZonas = Join-Path $carpeta 'Config_Zonas.json'
+    if (Test-Path $rutaZonas) {
+        $mapa = Get-Content $rutaZonas -Raw -Encoding UTF8 | ConvertFrom-Json
+        $filas = New-Object System.Collections.Generic.List[object]
+        foreach ($p in $mapa.PSObject.Properties) {
+            $filas.Add([ordered]@{ codigo_producto = [string]$p.Name; zona = [string]$p.Value })
+        }
+        Vaciar-Con-Filtro -Tabla 'config_zonas' -ColumnaLlave 'codigo_producto'
+        if ($filas.Count -gt 0) { Enviar-Lote -Tabla 'config_zonas' -Filas $filas }
+        Escribir-Log "  config_zonas: $($filas.Count) asignaciones."
+    }
+    else { Escribir-Log "  Config_Zonas.json no encontrado en $carpeta (se omite)." }
+
+    $rutaCerdos = Join-Path $carpeta 'Cerdos_Por_Dia.json'
+    if (Test-Path $rutaCerdos) {
+        $mapa = Get-Content $rutaCerdos -Raw -Encoding UTF8 | ConvertFrom-Json
+        $filas = New-Object System.Collections.Generic.List[object]
+        foreach ($p in $mapa.PSObject.Properties) {
+            $filas.Add([ordered]@{ fecha = [string]$p.Name; cerdos = [int]$p.Value })
+        }
+        Vaciar-Con-Filtro -Tabla 'cerdos_por_dia' -ColumnaLlave 'fecha'
+        if ($filas.Count -gt 0) { Enviar-Lote -Tabla 'cerdos_por_dia' -Filas $filas }
+        Escribir-Log "  cerdos_por_dia: $($filas.Count) fechas."
+    }
+    else { Escribir-Log "  Cerdos_Por_Dia.json no encontrado en $carpeta (se omite)." }
+
+    # Valores sueltos: peso de vara y tipos de cambio, a la tabla parametros.
+    $parametros = New-Object System.Collections.Generic.List[object]
+
+    $rutaVara = Join-Path $carpeta 'Peso_Vara.json'
+    if (Test-Path $rutaVara) {
+        $j = Get-Content $rutaVara -Raw -Encoding UTF8 | ConvertFrom-Json
+        if ($j.PesoVara) { $parametros.Add([ordered]@{ clave = 'peso_vara'; valor = [double]$j.PesoVara }) }
+    }
+
+    $rutaTc = Join-Path $carpeta 'Tipos_Cambio.json'
+    if (Test-Path $rutaTc) {
+        $j = Get-Content $rutaTc -Raw -Encoding UTF8 | ConvertFrom-Json
+        foreach ($m in @('USD', 'EUR', 'JPY')) {
+            if ($j.$m) { $parametros.Add([ordered]@{ clave = "tc_$($m.ToLower())"; valor = [double]$j.$m }) }
+        }
+    }
+
+    if ($parametros.Count -gt 0) {
+        Enviar-Lote -Tabla 'parametros' -Filas $parametros -ClaveConflicto 'clave'
+        Escribir-Log "  parametros: $($parametros.Count) valores."
+    }
+    else { Escribir-Log "  Sin Peso_Vara.json ni Tipos_Cambio.json en $carpeta (se omiten)." }
+}
+
 $Tablas = @(
     # IncrementalAccess/IncrementalPg: columna de marca de tiempo que permite
     # subir solo lo nuevo en modo -SoloNuevos. Las tablas sin esta columna son
@@ -362,6 +427,9 @@ try {
         $lector.Close()
         Escribir-Log "  $($tabla.Postgres) completa: $total filas."
     }
+
+    Sincronizar-Configuraciones
+
     Escribir-Log 'Migracion finalizada con exito.'
 }
 catch {

@@ -1,0 +1,501 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cuadre de Piezas — Comafri</title>
+<style>
+  :root{
+    --fondo:#070B18; --panel:#0E1530; --campo:#0A1128; --linea:#22305C;
+    --texto:#E8EDFA; --texto2:#8C9BC4;
+    --azul:#1B3F94; --naranja:#F7941D;
+    --n-azul:#3D8BFF; --n-cyan:#00E5FF; --n-naranja:#FFA829;
+    --n-rojo:#FF3B6B; --n-verde:#00FFA3; --n-violeta:#A96BFF;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--fondo);color:var(--texto);
+       font-family:"Segoe UI",system-ui,-apple-system,sans-serif;font-size:14px}
+
+  header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;
+         padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--linea)}
+  header h1{margin:0;font-size:17px;font-weight:600;letter-spacing:.3px}
+  header h1 span{color:var(--naranja)}
+  .controles{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-left:auto}
+  label{color:var(--texto2);font-size:12px}
+  input,select,button{background:var(--campo);color:var(--texto);
+        border:1px solid var(--linea);border-radius:6px;padding:6px 10px;font-size:13px}
+  button{cursor:pointer}
+  button:hover{border-color:var(--n-azul)}
+  button.activo{background:var(--azul);border-color:var(--n-azul)}
+
+  .cinta{display:flex;flex-wrap:wrap;gap:10px;padding:10px 16px}
+  .tarjeta{background:var(--panel);border:1px solid var(--linea);border-radius:10px;
+           padding:10px 14px;min-width:132px;flex:1 1 132px}
+  .tarjeta .rot{color:var(--texto2);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+  .tarjeta .val{font-size:21px;font-weight:600;margin-top:3px}
+  .tarjeta .sub{color:var(--texto2);font-size:11px;margin-top:2px}
+
+  main{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(0,1fr);
+       gap:12px;padding:0 16px 16px}
+  @media (max-width:1000px){ main{grid-template-columns:1fr} }
+
+  .caja{background:var(--panel);border:1px solid var(--linea);border-radius:12px;padding:12px}
+  .caja h2{margin:0 0 10px;font-size:12px;font-weight:600;color:var(--texto2);
+           text-transform:uppercase;letter-spacing:.7px}
+
+  svg.cerdo{width:100%;height:auto;display:block}
+  svg.cerdo .zona{cursor:pointer;transition:opacity .12s}
+  svg.cerdo .zona:hover{opacity:.82}
+  svg.cerdo .zona.sel{stroke:#fff;stroke-width:4}
+  svg.cerdo text{font-family:inherit;pointer-events:none}
+
+  table{width:100%;border-collapse:collapse;font-size:12.5px}
+  th{text-align:left;color:var(--texto2);font-weight:500;font-size:11px;
+     text-transform:uppercase;letter-spacing:.4px;padding:6px 8px;
+     border-bottom:1px solid var(--linea);position:sticky;top:0;background:var(--panel)}
+  td{padding:5px 8px;border-bottom:1px solid rgba(34,48,92,.45)}
+  tbody tr{cursor:pointer}
+  tbody tr:hover{background:rgba(61,139,255,.09)}
+  tbody tr.sel{background:rgba(27,63,148,.5)}
+  .num{text-align:right;font-variant-numeric:tabular-nums}
+  .scroll{max-height:330px;overflow:auto}
+  .tabla-envoltura{overflow-x:auto}
+
+  .paneles{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px}
+  .pnl{background:var(--campo);border:1px solid var(--linea);
+       border-left-width:3px;border-radius:8px;padding:9px 11px}
+  .pnl .nom{font-size:11.5px;font-weight:600;letter-spacing:.3px}
+  .pnl .kg{font-size:19px;font-weight:600;margin-top:4px;font-variant-numeric:tabular-nums}
+  .pnl .nota{color:var(--texto2);font-size:10.5px;margin-top:3px;line-height:1.35}
+
+  .aviso{background:rgba(255,168,41,.11);border:1px solid var(--n-naranja);
+         border-radius:8px;padding:9px 12px;margin:0 16px 10px;
+         font-size:12.5px;color:var(--n-naranja);line-height:1.45}
+  .estado{padding:2px 7px;border-radius:99px;font-size:10.5px;font-weight:600}
+
+  #tendencia{display:flex;align-items:flex-end;gap:3px;height:118px;
+             padding-top:6px;overflow-x:auto}
+  .barra{flex:1 1 0;min-width:15px;display:flex;flex-direction:column;
+         justify-content:flex-end;align-items:center;height:100%}
+  .barra .b{width:100%;border-radius:3px 3px 0 0;min-height:2px}
+  .barra .e{font-size:9px;color:var(--texto2);margin-top:3px;white-space:nowrap}
+  .barra .v{font-size:9px;color:var(--texto2);margin-bottom:2px}
+
+  .cargando{padding:34px;text-align:center;color:var(--texto2)}
+  .error{margin:16px;padding:14px;border-radius:10px;
+         background:rgba(255,59,107,.11);border:1px solid var(--n-rojo);
+         color:#FFC9D6;line-height:1.55;font-size:13px}
+  .error code{background:rgba(0,0,0,.35);padding:1px 5px;border-radius:4px}
+  .pie{color:var(--texto2);font-size:11px;padding:0 16px 22px;line-height:1.6}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Cuadre de <span>Piezas</span></h1>
+  <div class="controles">
+    <label for="fecha">Fecha</label>
+    <input type="date" id="fecha">
+    <label for="cerdos">Cerdos</label>
+    <input type="number" id="cerdos" min="1" max="5000" style="width:88px">
+    <button id="btnHoy">Último día</button>
+  </div>
+</header>
+
+<div id="avisoZonas" class="aviso" hidden></div>
+<div id="error" class="error" hidden></div>
+
+<div class="cinta" id="cinta"></div>
+
+<main>
+  <div>
+    <div class="caja">
+      <h2 id="tituloCerdo">Rendimiento por zona</h2>
+      <svg class="cerdo" id="svgCerdo" viewBox="120 -40 680 460" aria-label="Silueta del cerdo por zonas"></svg>
+    </div>
+    <div class="caja" style="margin-top:12px">
+      <h2>Cuero, recortes, huesos y despojos — kg por cerdo</h2>
+      <div class="paneles" id="paneles"></div>
+    </div>
+    <div class="caja" style="margin-top:12px">
+      <h2 id="tituloTendencia">Tendencia — últimos 14 días</h2>
+      <div id="tendencia"></div>
+      <div id="promedios" class="pie" style="padding:8px 0 0"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="caja">
+      <h2>Detalle</h2>
+      <div id="detalle"></div>
+    </div>
+    <div class="caja" style="margin-top:12px">
+      <h2>Resumen por zona</h2>
+      <div class="scroll tabla-envoltura">
+        <table id="tablaZonas">
+          <thead><tr><th>Zona</th><th class="num">Piezas</th><th class="num">Esperado</th>
+                     <th class="num">%</th><th>Estado</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</main>
+
+<div class="pie">
+  Se actualiza solo cada 90 segundos. Mismos criterios que la app de escritorio:
+  cliente <strong>AASA PORK LIMITADA</strong>, medido por <strong>fecha de pesaje</strong>,
+  y la estación <strong>COM_DSK_SUBPROD</strong> cuenta como subproducto.
+</div>
+
+<script src="anatomia.js"></script>
+<script src="config.js"></script>
+<script>
+const A = window.ANATOMIA, CFG = window.CONFIG;
+const COL = {rojo:'#FF3B6B',naranja:'#FFA829',verde:'#00FFA3',violeta:'#A96BFF',
+             texto2:'#8C9BC4',linea:'#22305C',campo:'#0A1128'};
+const IDS_PANELES = A.paneles.map(p => p.id);
+const CERDOS_DEFECTO = 700;
+
+// Mismos cortes de color que Get-ColorPct / Get-EstadoPct del original.
+const colorPct  = p => p > 105 ? COL.violeta : p >= 98 ? COL.verde : p >= 85 ? COL.naranja : COL.rojo;
+const estadoPct = p => p > 105 ? 'Sobre'     : p >= 98 ? 'OK'      : p >= 85 ? 'Parcial'   : 'Bajo';
+const fmt = (n, d = 0) => (n ?? 0).toLocaleString('es-CL', {minimumFractionDigits:d, maximumFractionDigits:d});
+const hoyISO = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+
+let estado = {fecha:null, cfgZonas:{}, cerdosDia:{}, materiales:[], zonaSel:null, tendRaw:{}};
+
+// ---------- acceso a datos ----------
+async function api(ruta, opciones = {}) {
+  const r = await fetch(`${CFG.url}/rest/v1/${ruta}`, {
+    ...opciones,
+    headers: {apikey: CFG.anonKey, Authorization: `Bearer ${CFG.anonKey}`,
+              'Content-Type':'application/json', ...(opciones.headers||{})}
+  });
+  if (!r.ok) throw new Error(`${r.status} ${r.statusText} — ${(await r.text()).slice(0,180)}`);
+  return r.json();
+}
+const rpc = (fn, args) => api(`rpc/${fn}`, {method:'POST', body:JSON.stringify(args)});
+
+async function cargarConfiguracion() {
+  const [zonas, cerdos] = await Promise.all([
+    api('config_zonas?select=codigo_producto,zona&limit=5000'),
+    api('cerdos_por_dia?select=fecha,cerdos&limit=5000')
+  ]);
+  estado.cfgZonas  = Object.fromEntries(zonas.map(z => [String(z.codigo_producto), z.zona]));
+  estado.cerdosDia = Object.fromEntries(cerdos.map(c => [String(c.fecha).slice(0,10), c.cerdos]));
+}
+
+// ---------- agregacion: replica Get-AggZonas ----------
+function agregar(materiales, cfg) {
+  const agg = {}, pan = {}, sin = [];
+  A.zonas.forEach(z => agg[z.id] = {zona:z, piezas:0, mats:[]});
+  A.paneles.forEach(p => pan[p.id] = {panel:p, kg:0, mats:[]});
+  let excluidas = 0, kgTotal = 0, kgZonas = 0;
+
+  for (const m of materiales) {
+    kgTotal += m.kg;
+    // Todo lo etiquetado en la estacion de subproductos es subproducto,
+    // sin importar el nombre ni lo que diga la configuracion.
+    if (m.esSub === 1) { pan.subprod.kg += m.kg; pan.subprod.mats.push(m); continue; }
+
+    const zid = cfg[String(m.codigo)];
+    if (zid === 'excluido') { excluidas += m.piezas; continue; }
+    if (zid && pan[zid])    { pan[zid].kg += m.kg; pan[zid].mats.push(m); continue; }
+    if (zid && agg[zid])    { kgZonas += m.kg; agg[zid].piezas += m.piezas; agg[zid].mats.push(m); }
+    else                    { sin.push(m); }
+  }
+  const totalAsignadas = A.zonas.reduce((s,z) => s + agg[z.id].piezas, 0);
+  return {agg, pan, sin, excluidas, totalAsignadas, kgTotal, kgZonas};
+}
+
+// ---------- replica Compute-Tendencia ----------
+function calcularTendencia(raw, cfg, cerdosDia, fecha, zonaSel) {
+  let mult = A.sumaMultiplicadores;
+  if (zonaSel) { const z = A.zonas.find(z => z.id === zonaSel); if (z) mult = z.mult; }
+
+  const lista = [];
+  for (const dia of Object.keys(raw).sort()) {
+    let piezas = 0;
+    for (const [cod, p] of Object.entries(raw[dia])) {
+      const zid = cfg[cod];
+      if (!zid || zid === 'excluido') continue;
+      if (!zonaSel || zid === zonaSel) piezas += p;
+    }
+    if (piezas <= 0) continue;
+    const cerdos = cerdosDia[dia] ?? CERDOS_DEFECTO;
+    const esp = cerdos * mult;
+    lista.push({dia, pct: esp > 0 ? piezas / esp * 100 : 0});
+  }
+  const mesKey = fecha.slice(0,7);
+  const delMes = lista.filter(x => x.dia.startsWith(mesKey));
+  const ult14  = lista.slice(-14);
+  const prom = a => a.length ? a.reduce((s,x) => s + x.pct, 0) / a.length : 0;
+  return {barras: ult14, prom14: prom(ult14), promMes: prom(delMes),
+          mesTexto: fecha.slice(5,7) + '-' + fecha.slice(0,4)};
+}
+
+// ---------- dibujo del cerdo ----------
+function dibujarCerdo(r, cerdos) {
+  const svg = document.getElementById('svgCerdo');
+  const ns = 'http://www.w3.org/2000/svg';
+  svg.textContent = '';
+  const nuevo = (t, at) => { const e = document.createElementNS(ns, t);
+    for (const k in at) e.setAttribute(k, at[k]); return e; };
+
+  svg.appendChild(nuevo('path', {d: A.cuerpo, fill: COL.campo,
+                                 stroke: COL.linea, 'stroke-width': 2}));
+
+  for (const z of A.zonas) {
+    const d = r.agg[z.id];
+    const esp = cerdos * z.mult;
+    const pct = esp > 0 ? d.piezas / esp * 100 : 0;
+    const col = colorPct(pct);
+
+    let forma;
+    if (z.d.startsWith('ELIPSE:')) {
+      const [cx, cy, rx, ry] = z.d.slice(7).split(',').map(Number);
+      forma = nuevo('ellipse', {cx, cy, rx, ry});
+    } else {
+      forma = nuevo('path', {d: z.d});
+    }
+    forma.setAttribute('fill', col);
+    forma.setAttribute('fill-opacity', d.piezas > 0 ? 0.62 : 0.13);
+    forma.setAttribute('stroke', col);
+    forma.setAttribute('stroke-width', 1.5);
+    forma.setAttribute('class', 'zona' + (estado.zonaSel === z.id ? ' sel' : ''));
+    forma.addEventListener('click', () => seleccionar(estado.zonaSel === z.id ? null : z.id));
+    const t = nuevo('title', {});
+    t.textContent = `${z.nombre}: ${fmt(d.piezas)} de ${fmt(esp)} piezas (${fmt(pct,1)}%)`;
+    forma.appendChild(t);
+    svg.appendChild(forma);
+
+    // Estrias del baby back, solo decorativas (van sobre su zona).
+    if (z.id === 'baby') {
+      for (const e of A.estrias) {
+        svg.appendChild(nuevo('path', {d: e, stroke: COL.campo,
+                                       'stroke-width': 1.3, fill: 'none', opacity: .5}));
+      }
+    }
+
+    // Etiqueta: dentro de la figura o afuera con linea guia, segun el modo.
+    const fuera = z.modo === 'L' || z.modo === 'R' || z.modo === 'T';
+    if (fuera && z.ax) {
+      svg.appendChild(nuevo('line', {x1: z.lx, y1: z.ly, x2: z.ax, y2: z.ay,
+                                     stroke: COL.linea, 'stroke-width': 1}));
+    }
+    const anclaje = z.modo === 'R' ? 'end' : z.modo === 'L' ? 'start' : 'middle';
+    const nom = nuevo('text', {x: z.lx, y: z.ly, fill: '#E8EDFA',
+                               'font-size': 13, 'font-weight': 600, 'text-anchor': anclaje});
+    nom.textContent = z.nombre;
+    svg.appendChild(nom);
+    const val = nuevo('text', {x: z.lx, y: z.ly + 16, fill: col,
+                               'font-size': 14, 'font-weight': 700, 'text-anchor': anclaje});
+    val.textContent = fmt(pct, 1) + '%';
+    svg.appendChild(val);
+  }
+}
+
+// ---------- render principal ----------
+function render() {
+  const cerdos = Number(document.getElementById('cerdos').value) || CERDOS_DEFECTO;
+  const r = agregar(estado.materiales, estado.cfgZonas);
+
+  dibujarCerdo(r, cerdos);
+
+  const espGlobal = cerdos * A.sumaMultiplicadores;
+  const pctGlobal = espGlobal > 0 ? r.totalAsignadas / espGlobal * 100 : 0;
+  const kgPorCerdo = cerdos > 0 ? r.kgTotal / cerdos : 0;
+
+  document.getElementById('cinta').innerHTML = `
+    <div class="tarjeta"><div class="rot">Cuadre global</div>
+      <div class="val" style="color:${colorPct(pctGlobal)}">${fmt(pctGlobal,1)} %</div>
+      <div class="sub">${fmt(r.totalAsignadas)} de ${fmt(espGlobal)} piezas</div></div>
+    <div class="tarjeta"><div class="rot">Cerdos del día</div>
+      <div class="val">${fmt(cerdos)}</div>
+      <div class="sub">${A.sumaMultiplicadores} piezas esperadas c/u</div></div>
+    <div class="tarjeta"><div class="rot">Kilos totales</div>
+      <div class="val">${fmt(r.kgTotal,0)}</div>
+      <div class="sub">${fmt(kgPorCerdo,1)} kg por cerdo</div></div>
+    <div class="tarjeta"><div class="rot">Materiales sin zona</div>
+      <div class="val" style="color:${r.sin.length ? COL.naranja : COL.verde}">${r.sin.length}</div>
+      <div class="sub">${fmt(r.sin.reduce((s,m)=>s+m.piezas,0))} piezas sin asignar</div></div>`;
+
+  // Paneles laterales: se miden en kg por cerdo, no en piezas.
+  document.getElementById('paneles').innerHTML = A.paneles.map(p => {
+    const d = r.pan[p.id];
+    const porCerdo = cerdos > 0 ? d.kg / cerdos : 0;
+    return `<div class="pnl" style="border-left-color:${p.color}">
+      <div class="nom" style="color:${p.color}">${p.nombre}</div>
+      <div class="kg">${fmt(porCerdo,2)} <span style="font-size:11px;color:var(--texto2)">kg/cerdo</span></div>
+      <div class="nota">${fmt(d.kg,0)} kg totales · ${p.nota}</div></div>`;
+  }).join('');
+
+  // Panel de detalle: zona elegida, o cuadre global con los materiales sin zona.
+  const det = document.getElementById('detalle');
+  if (estado.zonaSel) {
+    const z = A.zonas.find(x => x.id === estado.zonaSel);
+    const d = r.agg[z.id];
+    const esp = cerdos * z.mult;
+    const pct = esp > 0 ? d.piezas / esp * 100 : 0;
+    const dif = esp - d.piezas;
+    const msg = dif > 0 ? `Faltan ${fmt(dif)} piezas`
+              : dif < 0 ? `Sobran ${fmt(-dif)} piezas (revisar posible doble conteo)`
+              : 'Cuadre exacto';
+    const colDif = dif > 0 ? COL.naranja : dif < 0 ? COL.violeta : COL.verde;
+    det.innerHTML = `
+      <div style="font-size:16px;font-weight:600">${z.nombre}</div>
+      <div style="color:var(--texto2);font-size:12px;margin-top:2px">
+        ${z.mult} pieza(s) por cerdo · ${fmt(cerdos)} cerdos</div>
+      <div style="font-size:31px;font-weight:700;margin:8px 0;color:${colorPct(pct)}">${fmt(pct,1)} %</div>
+      <div style="font-size:12.5px">Total producido: <strong>${fmt(d.piezas)}</strong> piezas</div>
+      <div style="font-size:12.5px;color:var(--texto2)">Esperado: ${fmt(esp)} (${z.mult} × ${fmt(cerdos)})</div>
+      <div style="font-size:12.5px;color:${colDif};margin-top:4px">${msg}</div>
+      <div class="scroll tabla-envoltura" style="margin-top:10px">${tablaMateriales(d.mats)}</div>
+      <button style="margin-top:10px" onclick="seleccionar(null)">← Ver cuadre global</button>`;
+  } else {
+    det.innerHTML = `
+      <div style="font-size:16px;font-weight:600">Cuadre global</div>
+      <div style="color:var(--texto2);font-size:12px;margin-top:2px">
+        ${A.zonas.length} zonas · ${fmt(cerdos)} cerdos · ${A.sumaMultiplicadores} piezas esperadas por cerdo</div>
+      <div style="font-size:31px;font-weight:700;margin:8px 0;color:${colorPct(pctGlobal)}">${fmt(pctGlobal,1)} %</div>
+      <div style="font-size:12.5px">Piezas asignadas: <strong>${fmt(r.totalAsignadas)}</strong></div>
+      <div style="font-size:12.5px;color:var(--texto2)">Esperado global: ${fmt(espGlobal)}</div>
+      <div style="font-size:12.5px;color:${r.sin.length ? COL.naranja : COL.verde};margin-top:4px">
+        ${r.sin.length ? `${r.sin.length} materiales sin zona` : 'Todos los materiales del día tienen zona'}</div>
+      <div style="color:var(--texto2);font-size:11.5px;margin-top:9px">
+        Toca una zona del cerdo para ver su detalle.</div>
+      <div class="scroll tabla-envoltura" style="margin-top:8px">${tablaMateriales(r.sin)}</div>`;
+  }
+
+  // Resumen por zona
+  document.querySelector('#tablaZonas tbody').innerHTML = A.zonas.map(z => {
+    const d = r.agg[z.id];
+    const esp = cerdos * z.mult;
+    const pct = esp > 0 ? d.piezas / esp * 100 : 0;
+    return `<tr class="${estado.zonaSel === z.id ? 'sel' : ''}" onclick="seleccionar('${z.id}')">
+      <td>${z.nombre}</td><td class="num">${fmt(d.piezas)}</td><td class="num">${fmt(esp)}</td>
+      <td class="num" style="color:${colorPct(pct)}">${fmt(pct,1)}%</td>
+      <td><span class="estado" style="background:${colorPct(pct)}22;color:${colorPct(pct)}">${estadoPct(pct)}</span></td></tr>`;
+  }).join('');
+
+  const av = document.getElementById('avisoZonas');
+  if (r.sin.length) {
+    const piezas = r.sin.reduce((s,m) => s + m.piezas, 0);
+    av.textContent = `Hay ${r.sin.length} materiales con piezas y sin zona asignada (${fmt(piezas)} piezas). ` +
+      `Mientras no tengan zona no suman a ningún cuadre. Aparecen en el panel de detalle cuando no hay zona seleccionada.`;
+    av.hidden = false;
+  } else av.hidden = true;
+
+  dibujarTendencia();
+}
+
+function tablaMateriales(mats) {
+  if (!mats.length) return '<div style="color:var(--texto2);font-size:12px;padding:6px 0">Sin materiales.</div>';
+  const filas = [...mats].sort((a,b) => b.piezas - a.piezas).map(m =>
+    `<tr><td>${m.producto}</td><td class="num">${fmt(m.codigo)}</td>
+         <td class="num">${fmt(m.piezas)}</td><td class="num">${fmt(m.cajas)}</td></tr>`).join('');
+  return `<table><thead><tr><th>Material</th><th class="num">Código</th>
+          <th class="num">Piezas</th><th class="num">Cajas</th></tr></thead><tbody>${filas}</tbody></table>`;
+}
+
+function dibujarTendencia() {
+  const t = calcularTendencia(estado.tendRaw, estado.cfgZonas, estado.cerdosDia,
+                              estado.fecha, estado.zonaSel);
+  const cont = document.getElementById('tendencia');
+  const zonaTxt = estado.zonaSel
+    ? (A.zonas.find(z => z.id === estado.zonaSel)?.nombre ?? 'global') : 'global';
+
+  if (!t.barras.length) {
+    cont.innerHTML = '<div style="color:var(--texto2);font-size:12px">Sin datos en el período.</div>';
+  } else {
+    const max = Math.max(110, ...t.barras.map(b => b.pct));
+    cont.innerHTML = t.barras.map(b => `
+      <div class="barra" title="${b.dia}: ${fmt(b.pct,1)}%">
+        <div class="v">${fmt(b.pct,0)}</div>
+        <div class="b" style="height:${(b.pct/max*100).toFixed(1)}%;background:${colorPct(b.pct)}"></div>
+        <div class="e">${b.dia.slice(8,10)}/${b.dia.slice(5,7)}</div></div>`).join('');
+  }
+  document.getElementById('tituloTendencia').textContent =
+    `Tendencia ${zonaTxt} — últimos 14 días`;
+  document.getElementById('promedios').textContent =
+    `Promedio 14 días: ${fmt(t.prom14,1)} %  ·  Promedio mes ${t.mesTexto}: ${fmt(t.promMes,1)} %`;
+}
+
+function seleccionar(id) { estado.zonaSel = id; render(); }
+window.seleccionar = seleccionar;
+
+// ---------- carga ----------
+async function cargarDia(fecha) {
+  estado.fecha = fecha;
+  const desde14 = new Date(fecha + 'T00:00:00');
+  desde14.setDate(desde14.getDate() - 13);
+  const inicioMes = fecha.slice(0,8) + '01';
+  const desde = hoyISO(desde14) < inicioMes ? hoyISO(desde14) : inicioMes;
+
+  const [mats, tend] = await Promise.all([
+    rpc('materiales_dia', {p_fecha: fecha}),
+    rpc('tendencia_cuadre', {p_desde: desde, p_hasta: fecha})
+  ]);
+
+  estado.materiales = mats.map(m => ({
+    codigo: Math.round(m.codigo_producto ?? 0),
+    producto: (m.producto_espanol ?? '').trim(),
+    piezas: Math.round(m.piezas ?? 0),
+    kg: m.kg ?? 0,
+    esSub: m.es_sub ?? 0,
+    cajas: Math.round(m.cajas ?? 0)
+  }));
+
+  estado.tendRaw = {};
+  for (const f of tend) {
+    (estado.tendRaw[f.dia] ??= {})[String(Math.round(f.codigo_producto))] = Math.round(f.piezas ?? 0);
+  }
+
+  document.getElementById('cerdos').value = estado.cerdosDia[fecha] ?? CERDOS_DEFECTO;
+  render();
+}
+
+function mostrarError(e) {
+  const div = document.getElementById('error');
+  div.hidden = false;
+  const faltaLlave = String(CFG.anonKey).includes('PEGAR_AQUI');
+  div.innerHTML = faltaLlave
+    ? `<strong>Falta la llave publicable.</strong><br>
+       Abre <code>web/config.js</code> y reemplaza <code>PEGAR_AQUI_LA_LLAVE_PUBLICABLE</code>
+       por la llave <code>sb_publishable_...</code> que aparece en Supabase →
+       Project Settings → API Keys.`
+    : `<strong>No se pudieron cargar los datos.</strong><br>${e.message}<br><br>
+       Si dice <code>404</code>, falta correr <code>nube/schema_cuadre.sql</code> en el
+       SQL Editor de Supabase. Si dice <code>401</code>, revisa la llave en
+       <code>web/config.js</code>.`;
+}
+
+async function iniciar() {
+  try {
+    await cargarConfiguracion();
+    const ultima = await rpc('ultima_fecha_produccion', {});
+    const fecha = (typeof ultima === 'string' ? ultima : ultima?.[0]) ?? hoyISO(new Date());
+    document.getElementById('fecha').value = fecha;
+    await cargarDia(fecha);
+
+    document.getElementById('fecha').addEventListener('change', e => {
+      estado.zonaSel = null;
+      cargarDia(e.target.value).catch(mostrarError);
+    });
+    document.getElementById('cerdos').addEventListener('input', render);
+    document.getElementById('btnHoy').addEventListener('click', async () => {
+      const u = await rpc('ultima_fecha_produccion', {});
+      const f = (typeof u === 'string' ? u : u?.[0]) ?? hoyISO(new Date());
+      document.getElementById('fecha').value = f;
+      estado.zonaSel = null;
+      cargarDia(f).catch(mostrarError);
+    });
+    // Se refresca sola, igual que la app de escritorio (90 segundos).
+    setInterval(() => cargarDia(estado.fecha).catch(() => {}), 90000);
+  } catch (e) { mostrarError(e); }
+}
+iniciar();
+</script>
+</body>
+</html>
