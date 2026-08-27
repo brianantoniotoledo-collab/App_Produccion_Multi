@@ -103,13 +103,24 @@ BOTON DE COPIAR (icono de dos hojitas) y pega eso en conexion.txt.
 "@
     }
 
-    $uri = "$SupabaseUrl/rest/v1/cajas?select=numero_caja&limit=1"
+    $uriLectura = "$SupabaseUrl/rest/v1/cajas?select=numero_caja&limit=1"
+    $uriEscritura = "$SupabaseUrl/rest/v1/cajas"
+    # Escritura de prueba con un arreglo vacio: PostgREST la acepta y no inserta
+    # nada, pero falla con 401 si el modo no tiene permiso de escribir.
+    $cuerpoVacio = [System.Text.Encoding]::UTF8.GetBytes('[]')
+
     $errores = @()
-    foreach ($modo in @('apikey', 'ambos', 'bearer')) {
+    # 'ambos' primero: el encabezado apikey solo identifica al proyecto, el rol
+    # con el que actua la base viene de Authorization. Sin el, Supabase trata la
+    # peticion como visitante anonimo: deja leer pero no escribir, y la
+    # migracion moria recien al enviar el primer lote.
+    foreach ($modo in @('ambos', 'bearer', 'apikey')) {
         try {
-            Invoke-RestMethod -Uri $uri -Headers (Encabezados -Modo $modo) -Method Get | Out-Null
+            Invoke-RestMethod -Uri $uriLectura -Headers (Encabezados -Modo $modo) -Method Get | Out-Null
+            Invoke-RestMethod -Uri $uriEscritura -Headers (Encabezados -Modo $modo -Prefer 'return=minimal') `
+                -Method Post -ContentType 'application/json; charset=utf-8' -Body $cuerpoVacio | Out-Null
             $script:ModoAuth = $modo
-            Escribir-Log "Conexion verificada correctamente (modo de autenticacion: $modo)."
+            Escribir-Log "Conexion verificada (lectura y escritura) con modo de autenticacion: $modo."
             return
         }
         catch {
@@ -123,19 +134,18 @@ BOTON DE COPIAR (icono de dos hojitas) y pega eso en conexion.txt.
     }
 
     throw @"
-Supabase rechazo la llave con las tres formas de autenticar:
+Supabase acepto la llave para leer pero no para escribir, con las tres formas
+de autenticar:
 $($errores -join "`n")
 
+Casi siempre significa que la llave es de solo lectura. Usa la llave SECRETA:
+Project Settings -> API Keys -> pestana "Legacy anon, service_role API keys"
+-> fila service_role -> Reveal -> boton de copiar. La llave 'anon' no sirve
+para escribir.
+
 La llave leida de conexion.txt tiene $largo caracteres ('$inicio...$final').
-
-Si $largo parece corto comparado con lo que ves en Supabase, quedo cortada al
-copiarla. Vuelve a copiarla con el BOTON DE COPIAR (no seleccionando el texto)
-desde Project Settings -> API Keys -> Secret keys, y pegala en conexion.txt en
-UNA sola linea.
-
-Si el largo es correcto, prueba con la llave legacy: en la pestana
-"Legacy anon, service_role API keys", boton Reveal en la fila service_role,
-copiar, y usar esa en conexion.txt.
+Si ese largo se ve corto comparado con lo que muestra Supabase, quedo cortada
+al copiarla: usa el BOTON DE COPIAR y pegala en UNA sola linea.
 "@
 }
 
