@@ -9,19 +9,40 @@ duplican), estandares_peso/inventario_sap se vacian y recargan completas
 (pedidos, pedidos_combos, programa_semanal) se saltan si ya tienen datos.
 
 Uso:
+  .\Migrar_A_Supabase.ps1
+  (lee SupabaseUrl y SupabaseKey desde nube\conexion.txt, ver conexion.ejemplo.txt)
+
   .\Migrar_A_Supabase.ps1 -SupabaseUrl "https://xxxx.supabase.co" -SupabaseKey "eyJ..."
+  (o se pasan directo como parametros, sin usar el archivo)
 
 La SupabaseKey es la "service_role" (Project Settings -> API). Es secreta:
-nunca se guarda en este script ni se sube al repositorio, se pasa cada vez
-como parametro.
+nunca se guarda en este script ni se sube al repositorio. "conexion.txt"
+esta en .gitignore para que se quede solo en tu disco.
 #>
 
 param(
     [string]$RutaAccess = 'C:\Produccion\Base_Produccion.accdb',
-    [Parameter(Mandatory)] [string]$SupabaseUrl,
-    [Parameter(Mandatory)] [string]$SupabaseKey,
+    [string]$SupabaseUrl,
+    [string]$SupabaseKey,
     [int]$TamanoLote = 500
 )
+
+if (-not $SupabaseUrl -or -not $SupabaseKey) {
+    $archivoConexion = Join-Path $PSScriptRoot 'conexion.txt'
+    if (-not (Test-Path $archivoConexion)) {
+        throw "Faltan -SupabaseUrl/-SupabaseKey y no existe $archivoConexion. Copia conexion.ejemplo.txt como conexion.txt y completa tus datos, o pasa los parametros directamente."
+    }
+    $valores = @{}
+    Get-Content $archivoConexion | Where-Object { $_ -match '=' -and $_ -notmatch '^\s*#' } | ForEach-Object {
+        $clave, $valor = $_ -split '=', 2
+        $valores[$clave.Trim()] = $valor.Trim()
+    }
+    if (-not $SupabaseUrl) { $SupabaseUrl = $valores['SupabaseUrl'] }
+    if (-not $SupabaseKey) { $SupabaseKey = $valores['SupabaseKey'] }
+}
+if (-not $SupabaseUrl -or -not $SupabaseKey) {
+    throw "conexion.txt no tiene SupabaseUrl y/o SupabaseKey completos."
+}
 
 $ErrorActionPreference = 'Stop'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
