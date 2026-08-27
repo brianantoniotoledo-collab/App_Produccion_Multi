@@ -1,0 +1,5 @@
+# Credenciales locales: nunca se suben al repositorio.
+nube/conexion.txt
+*.accdb
+Descargas_ERP/
+*_log.txt
