@@ -1,8 +1,0 @@
-SupabaseUrl=https://xxxxxxxxxxxx.supabase.co
-SupabaseKey=TU_SERVICE_ROLE_KEY_AQUI
-
-# Copia este archivo como "conexion.txt" (sin ".ejemplo") en esta misma
-# carpeta y reemplaza los valores por los reales de tu proyecto Supabase:
-#   SupabaseUrl -> Project Settings -> API -> Project URL
-#   SupabaseKey -> Project Settings -> API -> service_role (secret)
-# "conexion.txt" esta en .gitignore: se queda en tu disco, nunca se sube.
