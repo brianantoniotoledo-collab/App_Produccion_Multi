@@ -32,7 +32,13 @@ param(
     # Modo sincronizacion: sube solo lo que llego nuevo al Access desde la
     # ultima vez, en vez de recorrer todo. Es el modo para la tarea programada
     # que corre cada 20 minutos detras del importador.
-    [switch]$SoloNuevos
+    [switch]$SoloNuevos,
+    # Sube unicamente los archivos JSON de configuracion, sin abrir el Access.
+    # Sirve para hacerlo desde un PC que no tiene la base (ej. el notebook):
+    # los JSON estan en el repositorio, en app_original.
+    [switch]$SoloConfiguraciones,
+    # Carpeta donde buscar los JSON. Por defecto, la del propio Access.
+    [string]$CarpetaJson
 )
 
 if (-not $SupabaseUrl -or -not $SupabaseKey) {
@@ -212,7 +218,9 @@ function Sincronizar-Configuraciones {
     # Tipos_Cambio.json viven como archivos sueltos en C:\Produccion y NO
     # estan en el Access. La app web los necesita, y como se editan desde la
     # app, deben quedar en la nube para que el cambio se vea en todos lados.
-    $carpeta = Split-Path -Parent $RutaAccess
+    $carpeta = $CarpetaJson
+    if (-not $carpeta) { $carpeta = Split-Path -Parent $RutaAccess }
+    Escribir-Log "Configuraciones: leyendo JSON desde $carpeta"
 
     $rutaZonas = Join-Path $carpeta 'Config_Zonas.json'
     if (Test-Path $rutaZonas) {
@@ -342,12 +350,28 @@ $Tablas = @(
     }
 )
 
-if ($SoloNuevos) {
+if ($SoloConfiguraciones) {
+    Escribir-Log 'Inicio: solo configuraciones (sin abrir el Access).'
+} elseif ($SoloNuevos) {
     Escribir-Log 'Inicio de sincronizacion (solo lo nuevo).'
 } else {
     Escribir-Log 'Inicio de migracion a Supabase.'
 }
 Probar-Conexion
+
+# Solo configuraciones: no se toca el Access, asi se puede correr desde un PC
+# que no tiene la base (los JSON viven en el repositorio).
+if ($SoloConfiguraciones) {
+    try {
+        Sincronizar-Configuraciones
+        Escribir-Log 'Configuraciones subidas con exito.'
+    }
+    catch {
+        Escribir-Log "ERROR: $($_.Exception.Message)"
+        throw
+    }
+    return
+}
 
 $conexionAccess = New-Object System.Data.OleDb.OleDbConnection("Provider=Microsoft.ACE.OLEDB.12.0;Data Source=$RutaAccess;")
 $conexionAccess.Open()
