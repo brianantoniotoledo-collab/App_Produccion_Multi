@@ -70,6 +70,17 @@ Funciona porque la app abre y cierra la conexión **por operación**: un escrito
 
 Pendiente para esto: carpeta compartida real (no OneDrive), motor ACE OLEDB en cada PC, e índices en el Access sobre `FechaPesaje` y `NombreCliente`. **El cambio de rutas en la app se hace en el otro proyecto de Claude, no aquí.**
 
+> **Trampa ya detectada:** Brian tiene
+> `C:\Users\brian.toledo\AGRICOLA INDUSTRIAL LO VALLEDOR AASA S.A`, que
+> **NO sirve**: esta bajo el perfil de usuario y es una carpeta de SharePoint
+> sincronizada por OneDrive. Sincronizar un `.accdb` de 1,6 GB que el
+> importador escribe cada 20 min genera resubidas constantes, pelea con el
+> archivo de bloqueo `.laccdb` y puede crear "copias en conflicto", que en una
+> base de datos significa datos divididos o corruptos.
+> Lo que hace falta es una ruta **UNC** (`\\servidor\Produccion`), servida por
+> el servidor, sin sincronizacion. Hay que pedirla explicitamente asi, porque
+> por defecto informatica suele ofrecer la de SharePoint.
+
 **Decision confirmada por Brian:** las tres pestañas (Cuadre, Giveaway, Buscar
 Producto) siguen leyendo del Access, **sin ningun cambio en la app**. Solo
 cambia donde vive el archivo: de `C:\Produccion` a la carpeta compartida.
@@ -96,7 +107,11 @@ Copia en la nube (Supabase/Postgres) + app web. Es lo único que funciona fuera 
 Access  →  script de sincronización  →  Supabase  →  app web
 ```
 
-El origen es una pieza reemplazable: hoy el Access se alimenta de un Excel descargado a mano del ERP; si algún día llega el acceso al SQL Server (`172.16.0.188:1433`, solicitado y pendiente), se cambia solo el cargador y el resto no se entera.
+El origen es una pieza reemplazable: hoy el Access se alimenta de un Excel descargado a mano del ERP; cuando llegue el acceso al SQL Server, se cambia solo el cargador y el resto no se entera.
+
+**Estado (ago-2026):** Brian esta gestionando el usuario de **solo lectura**
+(`db_datareader`) al SQL Server del ERP (`172.16.0.188:1433`). Cuando llegue,
+el cambio va en `Importador_Produccion.ps1`, NO en la app.
 
 ---
 
