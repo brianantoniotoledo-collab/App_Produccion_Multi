@@ -143,15 +143,37 @@ BOTON DE COPIAR (icono de dos hojitas) y pega eso en conexion.txt.
         }
     }
 
+    # En este proyecto las llaves nuevas (sb_secret_...) vienen siendo
+    # rechazadas y la legacy service_role si funciona, asi que se apunta
+    # derecho a esa en vez de dar una lista generica de posibilidades.
+    $pista = @"
+Casi siempre significa que la llave es de solo lectura. Usa la llave SECRETA:
+Project Settings -> API Keys -> pestana "Legacy anon, service_role API keys"
+-> fila service_role -> Reveal -> boton de copiar. La llave 'anon' no sirve
+para escribir.
+"@
+    if ($SupabaseKey.StartsWith('sb_secret_')) {
+        $pista = @"
+La llave empieza con 'sb_secret_'. En este proyecto ese formato viene siendo
+rechazado; la que SI funciona es la legacy service_role (empieza con 'eyJ' y
+es mucho mas larga):
+
+  Supabase -> Project Settings -> API Keys
+  -> pestana "Legacy anon, service_role API keys"
+  -> fila service_role -> Reveal -> boton de copiar
+
+OJO: conexion.txt no se sincroniza entre computadores (esta en .gitignore
+porque lleva la credencial). Si en otro PC ya funciona, es porque alli tiene
+la llave correcta: hay que ponerla tambien en este.
+"@
+    }
+
     throw @"
 Supabase acepto la llave para leer pero no para escribir, con las tres formas
 de autenticar:
 $($errores -join "`n")
 
-Casi siempre significa que la llave es de solo lectura. Usa la llave SECRETA:
-Project Settings -> API Keys -> pestana "Legacy anon, service_role API keys"
--> fila service_role -> Reveal -> boton de copiar. La llave 'anon' no sirve
-para escribir.
+$pista
 
 La llave leida de conexion.txt tiene $largo caracteres ('$inicio...$final').
 Si ese largo se ve corto comparado con lo que muestra Supabase, quedo cortada
