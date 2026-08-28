@@ -9,5 +9,5 @@
 
 window.CONFIG = {
   url: "https://mdkytnimqcivgypwqqqp.supabase.co",
-  anonKey: "PEGAR_AQUI_LA_LLAVE_PUBLICABLE"
+  anonKey: "sb_publishable_xiwomgwl3iMdk2VRA6Xl-Q_reTcM8iV"
 };
