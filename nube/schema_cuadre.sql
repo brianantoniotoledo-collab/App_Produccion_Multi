@@ -141,3 +141,14 @@ CREATE POLICY lectura_publica ON parametros     FOR SELECT TO anon USING (true);
 
 -- El script de sincronizacion usa la llave secreta (service_role), que
 -- pasa por encima de RLS: seguir escribiendo desde el PC no se ve afectado.
+
+-- ------------------------------------------------------------
+--  4. Indices
+--     Sin ellos cada consulta recorre las ~670.000 filas de cajas y
+--     Postgres la cancela por tiempo (error 57014). Ver nube/indices.sql,
+--     que es el mismo bloque para correrlo por separado.
+-- ------------------------------------------------------------
+CREATE INDEX IF NOT EXISTS idx_cajas_cliente_pesaje ON cajas (nombre_cliente, fecha_pesaje);
+CREATE INDEX IF NOT EXISTS idx_cajas_pesaje_desc    ON cajas (fecha_pesaje DESC);
+CREATE INDEX IF NOT EXISTS idx_cajas_codigo_pesaje  ON cajas (codigo_producto, fecha_pesaje);
+ANALYZE cajas;

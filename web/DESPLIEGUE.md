@@ -76,5 +76,6 @@ La página muestra el error en pantalla, en español:
 |---|---|
 | "Falta la llave publicable" | Paso 3: falta pegar la llave en `web/config.js` |
 | Error `404` | Falta correr `nube/schema_cuadre.sql` (paso 1) |
+| Error `500` con `statement timeout` | Faltan los índices: corre `nube/indices.sql` en el SQL Editor |
 | Error `401` | La llave de `config.js` está mal copiada |
 | Zonas todas en 0% | Falta el paso 2: la configuración de zonas no está en la nube |
