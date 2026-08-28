@@ -70,6 +70,24 @@ Funciona porque la app abre y cierra la conexión **por operación**: un escrito
 
 Pendiente para esto: carpeta compartida real (no OneDrive), motor ACE OLEDB en cada PC, e índices en el Access sobre `FechaPesaje` y `NombreCliente`. **El cambio de rutas en la app se hace en el otro proyecto de Claude, no aquí.**
 
+**Decision confirmada por Brian:** las tres pestañas (Cuadre, Giveaway, Buscar
+Producto) siguen leyendo del Access, **sin ningun cambio en la app**. Solo
+cambia donde vive el archivo: de `C:\Produccion` a la carpeta compartida.
+
+Si mas adelante llega el acceso al ERP, el cambio va en
+`Importador_Produccion.ps1` (que dejaria de leer el Excel y consultaria
+directo al SQL Server), **no en `Produccion_App.ps1`**. Asi la app nunca se
+entera y el Access sigue siendo el contrato estable que la protege de cambios
+de esquema del ERP.
+
+Idea pendiente para ese momento: una pestaña **"Desposte Online"** que
+consulte el ERP directo cada 20-30 segundos (no cada segundo: en la planta se
+etiqueta una caja cada ~21 s, refrescar mas seguido no aporta y carga el ERP
+al pedo). Seria la unica pestaña que habla con el ERP; las demas seguirian con
+el Access. Ese caso de uso es ademas el mejor argumento para pedirle el acceso
+a informatica, porque tiene un beneficio operativo visible y un patrocinador:
+el jefe de produccion.
+
 ### B. Acceso remoto de Brian (notebook personal, celular)
 
 Copia en la nube (Supabase/Postgres) + app web. Es lo único que funciona fuera de la red de la planta.
